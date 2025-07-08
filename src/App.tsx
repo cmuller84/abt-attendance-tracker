@@ -1,6 +1,6 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { Clock } from 'lucide-react';
-import './styles.css'; // keep your existing styles
+import './styles.css';
 
 /* ---------- Types ---------- */
 export interface Employee {
@@ -19,13 +19,12 @@ export interface Incident {
   pts: number;
 }
 
-/* ---------- Main ---------- */
+/* ---------- Main Component ---------- */
 export default function App() {
-  // core state
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
 
-  /* ----- Backup / Restore ----- */
+  /* ----- Backup / Restore logic ----- */
   const filePicker = useRef<HTMLInputElement | null>(null);
 
   const downloadBackup = () => {
@@ -88,9 +87,9 @@ export default function App() {
         </nav>
       </header>
 
-      {/* TODO: the rest of your tracker UI (alerts, tables, modals, etc.) */}
+      {/* TODO: your existing tables / alerts go here */}
 
-      {/* Footer shortcuts */}
+      {/* Footer */}
       <footer className="app-footer">
         <button className="btn-sm" onClick={downloadBackup}>Backup</button>
         <button className="btn-sm" onClick={handleRestoreClick}>Restore</button>
