@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    /* -------- basic -------- */
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "jsx": "react-jsx",
+
+    /* -------- strictness & DX -------- */
+    "strict": true,
+    "allowJs": true,              // let your existing .jsx files keep working
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "noEmit": true                // Vite/ESBuild does the emitting
+
+  },
+  "include": ["src"]
+}
