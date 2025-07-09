@@ -1,47 +1,29 @@
-import { useState, useRef, useEffect, ChangeEvent } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Clock } from 'lucide-react';
-import './styles/styles.css';
-
-/* ---------- Types ---------- */
-export interface Employee {
-  id: number;
-  first: string;
-  last: string;
-  center: string;
-  pts: number;
-}
-export interface Incident {
-  id: number;
-  employeeId: number;
-  date: string;
-  reason: string;
-  pts: number;
-}
+import './styles/styles.css';   // keep your CSS
 
 /* ---------- Helpers ---------- */
 const todayStamp = () => {
   const d = new Date();
   return (
-    d.getFullYear().toString() +
+    d.getFullYear() +
     String(d.getMonth() + 1).padStart(2, '0') +
     String(d.getDate()).padStart(2, '0')
   );
 };
 
-/* ---------- Component ---------- */
 export default function App() {
-  /* state */
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [employees, setEmployees] = useState([]);
+  const [incidents, setIncidents] = useState([]);
 
-  /* preload from localStorage */
+  /* load any saved data */
   useEffect(() => {
     setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
     setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
   }, []);
 
   /* Backup / Restore */
-  const filePicker = useRef<HTMLInputElement | null>(null);
+  const filePicker = useRef(null);
 
   const downloadBackup = () => {
     const blob = new Blob(
@@ -58,13 +40,13 @@ export default function App() {
 
   const handleRestoreClick = () => filePicker.current?.click();
 
-  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImport = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const data = JSON.parse(String(ev.target?.result));
+        const data = JSON.parse(ev.target.result);
         const emp = Array.isArray(data.employees) ? data.employees : [];
         const inc = Array.isArray(data.incidents) ? data.incidents : [];
         setEmployees(emp);
@@ -90,19 +72,19 @@ export default function App() {
 
         <div className="flex items-center gap-2">
           <button
-            className="rounded bg-sky-600 px-3 py-1 text-white hover:bg-sky-700"
+            className="rounded bg-sky-600 px-3 py-1 text-white"
             onClick={downloadBackup}
           >
             Backup ⭱
           </button>
           <button
-            className="rounded bg-emerald-600 px-3 py-1 text-white hover:bg-emerald-700"
+            className="rounded bg-emerald-600 px-3 py-1 text-white"
             onClick={handleRestoreClick}
           >
             Restore ⭳
           </button>
 
-          {/* hidden file-picker */}
+          {/* hidden file input */}
           <input
             ref={filePicker}
             type="file"
@@ -113,20 +95,15 @@ export default function App() {
         </div>
       </header>
 
-      {/* Add your tables / alerts here */}
-      <main className="flex-grow p-6">
-        <p className="text-sm text-gray-500">
-          Use&nbsp;<strong>Backup</strong>&nbsp;to download the current data, and&nbsp;
-          <strong>Restore</strong>&nbsp;to upload a saved&nbsp;<code>attendance-backup.json</code>.
-        </p>
+      {/* your existing UI goes here */}
+      <main className="flex-grow p-6 text-sm text-gray-500">
+        Import a backup JSON to populate employees and incidents.
       </main>
 
       {/* Footer */}
       <footer className="flex items-center justify-between px-4 py-2 bg-slate-100 text-xs text-gray-600">
         <span>© {new Date().getFullYear()} ABT</span>
-        <span>
-          {employees.length} employees • {incidents.length} incidents
-        </span>
+        <span>{employees.length} employees • {incidents.length} incidents</span>
       </footer>
     </div>
   );
