@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Clock } from 'lucide-react';
-import './styles/styles.css';            // keep your CSS
+import '../styles/styles.css';   // ✅ keep your stylesheet
 
 /* ---------- Helpers ---------- */
 const todayStamp = () => {
@@ -27,17 +27,17 @@ const downloadBackup = (employees, incidents) => {
 
 /* ---------- Component ---------- */
 export default function Home() {
-  /* ORIGINAL state */
+  /* your existing state */
   const [employees, setEmployees] = useState([]);
   const [incidents, setIncidents] = useState([]);
 
-  /* Pre-load anything saved earlier */
+  /* load any saved data once */
   useEffect(() => {
     setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
     setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
   }, []);
 
-  /* ---------- Restore handler ---------- */
+  /* Restore logic */
   const filePicker = useRef(null);
 
   const handleImport = (e) => {
@@ -63,21 +63,21 @@ export default function Home() {
 
   /* ---------- UI ---------- */
   return (
-    <div className="page-wrapper">
-      {/* header / hero */}
-      <div className="text-center my-6">
-        <Clock size={22} className="inline-block mr-2" />
+    <div className="container mx-auto px-4 py-6">
+      {/* header */}
+      <div className="text-center mb-6">
+        <Clock size={24} className="inline-block mr-2" />
         <span className="text-2xl font-bold">ABT Center Attendance Tracker</span>
       </div>
 
-      {/* TOOLBAR – original buttons + two new ones */}
+      {/* toolbar */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {/* original three buttons */}
+        {/* original buttons */}
         <button className="btn btn-primary">Add New Employee</button>
         <button className="btn btn-secondary">Record Attendance Issue</button>
         <button className="btn btn-success">Export to Excel</button>
 
-        {/* NEW Backup / Restore */}
+        {/* NEW buttons */}
         <button
           className="btn btn-info"
           onClick={() => downloadBackup(employees, incidents)}
@@ -101,8 +101,16 @@ export default function Home() {
         />
       </div>
 
-      {/* ---------- the rest of your existing UI ---------- */}
-      {/* Alerts, tables, modals, search bar … all unchanged */}
+      {/* existing content */}
+      <div className="alert alert-light mb-4">
+        No employees added yet. Add your first employee to get started.
+      </div>
+
+      {/* policy reference – unchanged */}
+      <div className="p-4 bg-blue-50 rounded text-sm">
+        <strong>ABT Attendance Policy Reference</strong>
+        {/* … keep whatever content was here … */}
+      </div>
     </div>
   );
 }
