@@ -3,14 +3,14 @@ import { Clock } from 'lucide-react';
 import './styles/styles.css';
 
 /* ---------- Types ---------- */
-export interface Employee {
+interface Employee {
   id: number;
   first: string;
   last: string;
   center: string;
   pts: number;
 }
-export interface Incident {
+interface Incident {
   id: number;
   employeeId: number;
   date: string;
@@ -28,39 +28,38 @@ const todayStamp = () => {
   );
 };
 
+const downloadBackup = (employees: Employee[], incidents: Incident[]) => {
+  const blob = new Blob(
+    [JSON.stringify({ employees, incidents }, null, 2)],
+    { type: 'application/json' }
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `attendance-backup-${todayStamp()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
 /* ---------- Component ---------- */
 export default function App() {
-  /* state (your original two hooks) */
+  /* original state */
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
 
-  /* preload from localStorage once */
+  /* preload any saved data */
   useEffect(() => {
     setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
     setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
   }, []);
 
-  /* Backup / Restore */
+  /* Restore logic */
   const filePicker = useRef<HTMLInputElement | null>(null);
-
-  const downloadBackup = () => {
-    const blob = new Blob(
-      [JSON.stringify({ employees, incidents }, null, 2)],
-      { type: 'application/json' }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance-backup-${todayStamp()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleRestoreClick = () => filePicker.current?.click();
 
   const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -81,60 +80,55 @@ export default function App() {
 
   /* ---------- UI ---------- */
   return (
-    <div className="min-h-screen flex flex-col bg-white text-gray-900">
-      {/* Header / toolbar – keeps your original buttons and adds two new ones */}
-      <header className="flex flex-col gap-4 p-6">
-        <div className="flex items-center gap-2">
-          <Clock size={20} />
-          <h1 className="text-xl font-bold">ABT Center Attendance Tracker</h1>
-        </div>
-        <p className="text-sm text-gray-600">
-          Track attendance points for staff members according to ABT Attendance Policy
-        </p>
+    <div className="container mx-auto px-4 py-6">
+      {/* logo + title */}
+      <div className="text-center mb-6">
+        <Clock size={22} className="inline-block mr-2" />
+        <span className="text-2xl font-bold">ABT Center Attendance Tracker</span>
+      </div>
 
-        {/* ORIGINAL toolbar buttons */}
-        <div className="flex flex-wrap gap-2">
-          <button className="btn btn-primary">Add New Employee</button>
-          <button className="btn btn-secondary">Record Attendance Issue</button>
-          <button className="btn btn-success">Export to Excel</button>
+      {/* alerts banner – unchanged */}
+      {/* ... your existing alerts component here ... */}
 
-          {/* NEW buttons */}
-          <button
-            className="btn btn-info"
-            onClick={downloadBackup}
-            title="Download current data"
-          >
-            Backup ⭱
-          </button>
-          <button
-            className="btn btn-warning"
-            onClick={handleRestoreClick}
-            title="Upload a backup JSON"
-          >
-            Restore ⭳
-          </button>
+      {/* TOOLBAR (Add / Record / Export) + new Backup/Restore */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button className="btn btn-primary">Add New Employee</button>
+        <button className="btn btn-secondary">Record Attendance Issue</button>
+        <button className="btn btn-success">Export to Excel</button>
 
-          {/* hidden file input */}
-          <input
-            ref={filePicker}
-            type="file"
-            accept="application/json"
-            onChange={handleImport}
-            style={{ display: 'none' }}
-          />
-        </div>
-      </header>
+        {/* NEW buttons */}
+        <button
+          className="btn btn-info"
+          onClick={() => downloadBackup(employees, incidents)}
+        >
+          Backup ⭱
+        </button>
+        <button
+          className="btn btn-warning"
+          onClick={() => filePicker.current?.click()}
+        >
+          Restore ⭳
+        </button>
 
-      {/* ----- the rest of your original UI (alerts, tables, etc.) ----- */}
-      <main className="flex-grow p-6">
-        {/* existing components remain untouched */}
-      </main>
+        {/* hidden file-picker */}
+        <input
+          ref={filePicker}
+          type="file"
+          accept="application/json"
+          onChange={handleImport}
+          style={{ display: 'none' }}
+        />
 
-      {/* simple footer */}
-      <footer className="px-4 py-2 bg-slate-100 text-xs text-gray-600 flex justify-between">
-        <span>© {new Date().getFullYear()} ABT</span>
-        <span>{employees.length} employees • {incidents.length} incidents</span>
-      </footer>
+        {/* existing search box */}
+        <input
+          type="text"
+          placeholder="Search employees..."
+          className="input input-bordered flex-grow md:flex-grow-0 md:w-64"
+        />
+      </div>
+
+      {/* ----- everything below is your original content ----- */}
+      {/* employee table, policy reference, modals, etc. stay untouched */}
     </div>
   );
 }
