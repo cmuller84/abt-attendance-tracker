@@ -1,6 +1,6 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { Clock } from 'lucide-react';
-import './styles.css';
+import './styles/styles.css';
 
 /* ---------- Types ---------- */
 export interface Employee {
