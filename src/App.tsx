@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { Clock } from 'lucide-react';
-import './styles/styles.css';   // keep your existing CSS
+import './styles/styles.css';
 
 /* ---------- Types ---------- */
 export interface Employee {
@@ -10,7 +10,6 @@ export interface Employee {
   center: string;
   pts: number;
 }
-
 export interface Incident {
   id: number;
   employeeId: number;
@@ -22,9 +21,11 @@ export interface Incident {
 /* ---------- Helpers ---------- */
 const todayStamp = () => {
   const d = new Date();
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
-    d.getDate()
-  ).padStart(2, '0')}`;
+  return (
+    d.getFullYear().toString() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0')
+  );
 };
 
 /* ---------- Component ---------- */
@@ -35,19 +36,18 @@ export default function App() {
 
   /* preload from localStorage */
   useEffect(() => {
-    const storedEmp = JSON.parse(localStorage.getItem('employees') ?? '[]');
-    const storedInc = JSON.parse(localStorage.getItem('incidents') ?? '[]');
-    if (storedEmp.length) setEmployees(storedEmp);
-    if (storedInc.length) setIncidents(storedInc);
+    setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
+    setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
   }, []);
 
-  /* Backup / Restore logic */
+  /* Backup / Restore */
   const filePicker = useRef<HTMLInputElement | null>(null);
 
   const downloadBackup = () => {
-    const blob = new Blob([JSON.stringify({ employees, incidents }, null, 2)], {
-      type: 'application/json',
-    });
+    const blob = new Blob(
+      [JSON.stringify({ employees, incidents }, null, 2)],
+      { type: 'application/json' }
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -61,20 +61,18 @@ export default function App() {
   const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
         const data = JSON.parse(String(ev.target?.result));
-        const empList = Array.isArray(data.employees) ? data.employees : [];
-        const incList = Array.isArray(data.incidents) ? data.incidents : [];
-        setEmployees(empList);
-        setIncidents(incList);
-        localStorage.setItem('employees', JSON.stringify(empList));
-        localStorage.setItem('incidents', JSON.stringify(incList));
+        const emp = Array.isArray(data.employees) ? data.employees : [];
+        const inc = Array.isArray(data.incidents) ? data.incidents : [];
+        setEmployees(emp);
+        setIncidents(inc);
+        localStorage.setItem('employees', JSON.stringify(emp));
+        localStorage.setItem('incidents', JSON.stringify(inc));
         alert('✅ Backup restored');
-      } catch (err) {
-        console.error(err);
+      } catch {
         alert('❌ Invalid backup file');
       }
     };
@@ -87,19 +85,18 @@ export default function App() {
       {/* Toolbar */}
       <header className="flex items-center justify-between gap-4 p-3 bg-slate-200 shadow-sm">
         <h1 className="flex items-center gap-2 text-lg font-semibold">
-          <Clock size={18} />
-          ABT Attendance Tracker <span className="text-xs">v4.3</span>
+          <Clock size={18} /> ABT Attendance Tracker <span className="text-xs">v4.3</span>
         </h1>
 
         <div className="flex items-center gap-2">
           <button
-            className="rounded bg-sky-600 px-3 py-1 text-white hover:bg-sky-700 transition-colors"
+            className="rounded bg-sky-600 px-3 py-1 text-white hover:bg-sky-700"
             onClick={downloadBackup}
           >
             Backup ⭱
           </button>
           <button
-            className="rounded bg-emerald-600 px-3 py-1 text-white hover:bg-emerald-700 transition-colors"
+            className="rounded bg-emerald-600 px-3 py-1 text-white hover:bg-emerald-700"
             onClick={handleRestoreClick}
           >
             Restore ⭳
@@ -116,10 +113,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* TODO: place your existing tables / alerts here */}
+      {/* Add your tables / alerts here */}
       <main className="flex-grow p-6">
         <p className="text-sm text-gray-500">
-          Import a backup JSON to populate employees and incidents.
+          Use&nbsp;<strong>Backup</strong>&nbsp;to download the current data, and&nbsp;
+          <strong>Restore</strong>&nbsp;to upload a saved&nbsp;<code>attendance-backup.json</code>.
         </p>
       </main>
 
