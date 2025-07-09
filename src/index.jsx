@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { HelmetProvider } from 'react-helmet-async';     // keep this because you installed the pkg
-import App from './App';                                 // ← point to the new TSX file
-import './styles.css';                                   // keep your global styles
+import { HelmetProvider } from 'react-helmet-async';
+
+import App from './App';
+import './styles/styles.css';          // ← points to src/styles/styles.css
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
