@@ -1,78 +1,108 @@
-import * as React from "react";
-import { animated } from "react-spring";
-import { useWiggle } from "../hooks/wiggle";
-import { Link } from "wouter";
+import { useState, useRef, useEffect } from 'react';
+import { Clock } from 'lucide-react';
+import './styles/styles.css';            // keep your CSS
 
-// Our language strings for the header
-const strings = [
-  "Hello React",
-  "Salut React",
-  "Hola React",
-  "안녕 React",
-  "Hej React"
-];
-
-// Utility function to choose a random value from the language array
-function randomLanguage() {
-  return strings[Math.floor(Math.random() * strings.length)];
-}
-
-/**
-* The Home function defines the content that makes up the main content of the Home page
-*
-* This component is attached to the /about path in router.jsx
-* The function in app.jsx defines the page wrapper that this appears in along with the footer
-*/
-
-export default function Home() {
-  /* We use state to set the hello string from the array https://reactjs.org/docs/hooks-state.html
-     - We'll call setHello when the user clicks to change the string
-  */
-  const [hello, setHello] = React.useState(strings[0]);
-  
-  /* The wiggle function defined in /hooks/wiggle.jsx returns the style effect and trigger function
-     - We can attach this to events on elements in the page and apply the resulting style
-  */
-  const [style, trigger] = useWiggle({ x: 5, y: 5, scale: 1 });
-
-  // When the user clicks we change the header language
-  const handleChangeHello = () => {
-    
-    // Choose a new Hello from our languages
-    const newHello = randomLanguage();
-    
-    // Call the function to set the state string in our component
-    setHello(newHello);
-  };
+/* ---------- Helpers ---------- */
+const todayStamp = () => {
+  const d = new Date();
   return (
-    <>
-      <h1 className="title">{hello}!</h1>
-      {/* When the user hovers over the image we apply the wiggle style to it */}
-      <animated.div onMouseEnter={trigger} style={style}>
-        <img
-          src="https://cdn.glitch.com/2f80c958-3bc4-4f47-8e97-6a5c8684ac2c%2Fillustration.svg?v=1618196579405"
-          className="illustration"
-          onClick={handleChangeHello}
-          alt="Illustration click to change language"
+    d.getFullYear() +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    String(d.getDate()).padStart(2, '0')
+  );
+};
+
+const downloadBackup = (employees, incidents) => {
+  const blob = new Blob(
+    [JSON.stringify({ employees, incidents }, null, 2)],
+    { type: 'application/json' }
+  );
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `attendance-backup-${todayStamp()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+/* ---------- Component ---------- */
+export default function Home() {
+  /* ORIGINAL state */
+  const [employees, setEmployees] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+
+  /* Pre-load anything saved earlier */
+  useEffect(() => {
+    setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
+    setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
+  }, []);
+
+  /* ---------- Restore handler ---------- */
+  const filePicker = useRef(null);
+
+  const handleImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const emp = Array.isArray(data.employees) ? data.employees : [];
+        const inc = Array.isArray(data.incidents) ? data.incidents : [];
+        setEmployees(emp);
+        setIncidents(inc);
+        localStorage.setItem('employees', JSON.stringify(emp));
+        localStorage.setItem('incidents', JSON.stringify(inc));
+        alert('✅ Backup restored');
+      } catch {
+        alert('❌ Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  /* ---------- UI ---------- */
+  return (
+    <div className="page-wrapper">
+      {/* header / hero */}
+      <div className="text-center my-6">
+        <Clock size={22} className="inline-block mr-2" />
+        <span className="text-2xl font-bold">ABT Center Attendance Tracker</span>
+      </div>
+
+      {/* TOOLBAR – original buttons + two new ones */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {/* original three buttons */}
+        <button className="btn btn-primary">Add New Employee</button>
+        <button className="btn btn-secondary">Record Attendance Issue</button>
+        <button className="btn btn-success">Export to Excel</button>
+
+        {/* NEW Backup / Restore */}
+        <button
+          className="btn btn-info"
+          onClick={() => downloadBackup(employees, incidents)}
+        >
+          Backup ⭱
+        </button>
+        <button
+          className="btn btn-warning"
+          onClick={() => filePicker.current?.click()}
+        >
+          Restore ⭳
+        </button>
+
+        {/* hidden file input */}
+        <input
+          ref={filePicker}
+          type="file"
+          accept="application/json"
+          onChange={handleImport}
+          style={{ display: 'none' }}
         />
-      </animated.div>
-      <div className="navigation">
-        {/* When the user hovers over this text, we apply the wiggle function to the image style */}
-        <animated.div onMouseEnter={trigger}>
-          <a className="btn--click-me" onClick={handleChangeHello}>
-            Psst, click me
-          </a>
-        </animated.div>
       </div>
-      <div className="instructions">
-        <h2>Using this project</h2>
-        <p>
-          This is the Glitch <strong>Hello React</strong> project. You can use
-          it to build your own app. See more info in the{" "}
-          <Link href="/about">About</Link> page, and check out README.md in the
-          editor for additional detail plus next steps you can take!
-        </p>
-      </div>
-    </>
+
+      {/* ---------- the rest of your existing UI ---------- */}
+      {/* Alerts, tables, modals, search bar … all unchanged */}
+    </div>
   );
 }
