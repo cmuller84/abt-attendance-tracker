@@ -1,3 +1,24 @@
+import { useRef } from 'react';   // if not already there
+
+/* ---------- Backup / Restore helpers ---------- */
+const todayStamp = () => {
+  const d = new Date();
+  return d.getFullYear()
+       + String(d.getMonth() + 1).padStart(2, '0')
+       + String(d.getDate()).padStart(2, '0');
+};
+const downloadBackup = (emp, inc) => {
+  const blob = new Blob([JSON.stringify({ employees: emp, incidents: inc }, null, 2)],
+                        { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `attendance-backup-${todayStamp()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+const filePicker = useRef(null);
+
 /*  src/pages/home.jsx  */
 
 import { useState, useEffect, useRef } from 'react';
