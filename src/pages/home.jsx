@@ -1,35 +1,13 @@
 /*  src/pages/home.jsx  */
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Clock } from 'lucide-react';
-import '../styles/styles.css';         /* <- your Tailwind sheet */
-
-/* ---------- Backup / Restore helpers ---------- */
-const todayStamp = () => {
-  const d = new Date();
-  return (
-    d.getFullYear() +
-    String(d.getMonth() + 1).padStart(2, '0') +
-    String(d.getDate()).padStart(2, '0')
-  );
-};
-const saveBackup = (emp, inc) => {
-  const blob = new Blob(
-    [JSON.stringify({ employees: emp, incidents: inc }, null, 2)],
-    { type: 'application/json' }
-  );
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `attendance-backup-${todayStamp()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
+import '../styles/styles.css';          // your Tailwind css
 
 export default function Home() {
   /* ---------- state ---------- */
   const [employees, setEmployees] = useState([]);
   const [incidents, setIncidents] = useState([]);
-  const [search, setSearch]   = useState('');
+  const [search, setSearch]       = useState('');
 
   /* ---------- preload localStorage ---------- */
   useEffect(() => {
@@ -37,9 +15,29 @@ export default function Home() {
     setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
   }, []);
 
-  /* ---------- restore ---------- */
+  /* ---------- backup / restore ---------- */
   const filePick = useRef(null);
-  const restore = (e) => {
+
+  /** download JSON backup */
+  const handleBackup = () => {
+    const d   = new Date();
+    const tag = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
+      d.getDate()
+    ).padStart(2, '0')}`;
+    const blob = new Blob(
+      [JSON.stringify({ employees, incidents }, null, 2)],
+      { type: 'application/json' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href    = url;
+    a.download = `attendance-backup-${tag}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /** restore from JSON backup */
+  const handleRestore = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     const r = new FileReader();
@@ -52,15 +50,15 @@ export default function Home() {
         setIncidents(inc);
         localStorage.setItem('employees', JSON.stringify(emp));
         localStorage.setItem('incidents', JSON.stringify(inc));
-        alert('✅  Backup restored');
-      } catch { alert('❌  Invalid backup file'); }
+        alert('✅ Backup restored');
+      } catch { alert('❌ Invalid backup file'); }
     };
     r.readAsText(f);
   };
 
-  /* ---------- derived ---------- */
-  const alerts = employees.filter(e => e.pts >= 4);
-  const filtered = employees.filter(e =>
+  /* ---------- derived values ---------- */
+  const alerts   = employees.filter(e => e.pts >= 4);
+  const visible  = employees.filter(e =>
     `${e.first} ${e.last}`.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -104,10 +102,9 @@ export default function Home() {
             Export to Excel
           </button>
 
-          {/* backup / restore */}
           <button
             className="btn bg-sky-600 text-white hover:bg-sky-700"
-            onClick={() => saveBackup(employees, incidents)}
+            onClick={handleBackup}
           >
             Backup ⭱
           </button>
@@ -121,16 +118,15 @@ export default function Home() {
             ref={filePick}
             type="file"
             accept="application/json"
-            onChange={restore}
+            onChange={handleRestore}
             style={{ display: 'none' }}
           />
 
-          {/* search */}
           <input
             type="text"
+            placeholder="Search employees…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search employees…"
             className="input border border-gray-300 rounded px-3 py-2 flex-grow md:w-64"
           />
         </div>
@@ -156,7 +152,7 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(emp => (
+                  {visible.map(emp => (
                     <tr key={emp.id} className="border-t">
                       <td className="p-2">{emp.first} {emp.last}</td>
                       <td className="p-2">{emp.center}</td>
@@ -169,18 +165,18 @@ export default function Home() {
           )}
         </section>
 
-        {/* policy snippet */}
+        {/* policy */}
         <section className="border border-blue-100 bg-blue-50 rounded p-4 text-sm shadow">
           <h3 className="font-semibold text-blue-600 mb-2">
             ABT Attendance Policy Reference
           </h3>
           <div className="grid md:grid-cols-2 gap-4">
             <ul className="space-y-1">
-              <li>• Unnotified Absence: <strong>10 pts</strong></li>
-              <li>• Late Arrival: <strong>2 pts</strong></li>
-              <li>• Early Departure: <strong>2 pts</strong></li>
-              <li>• Planned Absence: <strong>4 pts</strong></li>
-              <li>• Unexpected Illness: <strong>4 pts</strong></li>
+              <li>• Unnotified Absence: 10 pts</li>
+              <li>• Late Arrival: 2 pts</li>
+              <li>• Early Departure: 2 pts</li>
+              <li>• Planned Absence: 4 pts</li>
+              <li>• Unexpected Illness: 4 pts</li>
             </ul>
             <ul className="space-y-1">
               <li>• 4-7 pts: Verbal Warning</li>
