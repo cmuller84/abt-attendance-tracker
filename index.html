@@ -1,17 +1,21 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    
-    <!-- This is the main template for the site, with index.jsx building the content and behavior -->
-    
-    <title>Hello React!</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="https://glitch.com/favicon.ico" />
+    <meta charset="utf-8" />
+    <title>ABT Attendance Tracker</title>
+
+    <!-- Tailwind via CDN (fine for small apps) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Favicon (place abt-logo.png in the repo root or /public) -->
+    <link rel="icon" type="image/png" href="/abt-logo.png" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Vite injects the compiled CSS & JS links below during build -->
   </head>
-  <body>
+
+  <body class="bg-gray-50 text-gray-900">
     <div id="root"></div>
     <script type="module" src="/src/index.jsx"></script>
   </body>
