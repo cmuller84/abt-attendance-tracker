@@ -2,21 +2,30 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>ABT Attendance Tracker</title>
 
-    <!-- Tailwind via CDN (fine for small apps) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Page title (browser-tab text) -->
+    <title>ABT Center Attendance Tracker</title>
 
-    <!-- Favicon (place abt-logo.png in the repo root or /public) -->
-    <link rel="icon" type="image/png" href="/abt-logo.png" />
-
+    <!-- Mobile / zoom handling -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Vite injects the compiled CSS & JS links below during build -->
+    <!-- Favicon (place abt-logo.png in repo root or /public) -->
+    <link rel="icon" type="image/png" href="/abt-logo.png" />
+
+    <!-- Tailwind (CDN build) – provides all the styling classes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Extra: light grey background for the whole page -->
+    <style>
+      body { background: #f9fafb; } /* tailwind's bg-gray-50 */
+    </style>
   </head>
 
-  <body class="bg-gray-50 text-gray-900">
+  <body class="text-gray-900">
+    <!-- React mounts here -->
     <div id="root"></div>
+
+    <!-- Vite/React entry point (leave path exactly like this) -->
     <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>
