@@ -84,6 +84,8 @@ export default function App() {
   /* form refs */
   const addRef = useRef({ first: '', last: '', center: '', title: '' });
   const incRef = useRef({ empId: '', date: '', reason: '', pts: 0, notes: '' });
+  const [incidentPts, setIncidentPts] = useState<number>(0);
+  const [incidentNotes, setIncidentNotes] = useState<string>('');
 
   /* preload localStorage */
   useEffect(() => {
@@ -592,7 +594,9 @@ export default function App() {
               onChange={e => {
                 const [reason, pts] = e.target.value.split('|');
                 incRef.current.reason = reason;
-                incRef.current.pts = parseFloat(pts);
+                const pointValue = parseFloat(pts);
+                incRef.current.pts = pointValue;
+                setIncidentPts(pointValue);
               }}
             >
               <option value="">Select offense type…</option>
@@ -607,16 +611,30 @@ export default function App() {
               type="number"
               step="0.5"
               placeholder="Points"
+              value={incidentPts}
               className="input border w-full px-3 py-2"
-              onChange={e => (incRef.current.pts = e.target.value)}
+              onChange={e => {
+                const value = parseFloat(e.target.value) || 0;
+                setIncidentPts(value);
+                incRef.current.pts = value;
+              }}
             />
             <textarea
               placeholder="Notes (optional)"
+              value={incidentNotes}
               className="input border w-full px-3 py-2"
-              onChange={e => (incRef.current.notes = e.target.value)}
+              onChange={e => {
+                setIncidentNotes(e.target.value);
+                incRef.current.notes = e.target.value;
+              }}
             />
             <div className="flex justify-end gap-2 mt-2">
-              <button className="btn" onClick={() => setShowInc(false)}>
+              <button className="btn" onClick={() => {
+                incRef.current = { empId: '', date: '', reason: '', pts: 0, notes: '' };
+                setIncidentPts(0);
+                setIncidentNotes('');
+                setShowInc(false);
+              }}>
                 Cancel
               </button>
               <button className="btn bg-indigo-600 text-white" onClick={addIncident}>
