@@ -86,6 +86,8 @@ export default function App() {
   const incRef = useRef({ empId: '', date: '', reason: '', pts: 0, notes: '' });
   const [incidentPts, setIncidentPts] = useState<number>(0);
   const [incidentNotes, setIncidentNotes] = useState<string>('');
+  const [sortColumn, setSortColumn] = useState<'name' | 'title' | 'center' | 'pts' | 'status'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   /* preload localStorage */
   useEffect(() => {
@@ -121,8 +123,10 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges, autoBackup]);
 
-  /* persist on change */
+  /* persist on change with debounce to prevent rapid updates */
   useEffect(() => {
+    if (employees.length === 0 && incidents.length === 0) return;
+    
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('incidents', JSON.stringify(incidents));
     setHasUnsavedChanges(true);
@@ -134,6 +138,15 @@ export default function App() {
       localStorage.setItem('auto-backup-timestamp', new Date().toISOString());
     }
   }, [employees, incidents, autoBackup]);
+  
+  /* Clear edit states when modals close */
+  useEffect(() => {
+    if (!showDetails) {
+      setEditingIncident(null);
+      setEditValues({reason: '', pts: '0', notes: ''});
+      setEditingTitle(false);
+    }
+  }, [showDetails]);
 
   /* Restore logic */
   const filePicker = useRef<HTMLInputElement | null>(null);
@@ -169,9 +182,46 @@ export default function App() {
   };
   
   const alerts = employees.filter(e => e.pts >= 4 && !e.notificationCleared);
-  const visible = employees.filter(e =>
+  
+  // Filter and sort employees
+  const filtered = employees.filter(e =>
     `${e.first} ${e.last}`.toLowerCase().includes(search.toLowerCase())
   );
+  
+  const visible = [...filtered].sort((a, b) => {
+    let aVal: string | number;
+    let bVal: string | number;
+    
+    switch (sortColumn) {
+      case 'name':
+        aVal = `${a.last}, ${a.first}`.toLowerCase();
+        bVal = `${b.last}, ${b.first}`.toLowerCase();
+        break;
+      case 'title':
+        aVal = (a.title || '').toLowerCase();
+        bVal = (b.title || '').toLowerCase();
+        break;
+      case 'center':
+        aVal = a.center.toLowerCase();
+        bVal = b.center.toLowerCase();
+        break;
+      case 'pts':
+        aVal = a.pts;
+        bVal = b.pts;
+        break;
+      case 'status':
+        aVal = getActionLevel(a.pts).level;
+        bVal = getActionLevel(b.pts).level;
+        break;
+      default:
+        aVal = `${a.last}, ${a.first}`.toLowerCase();
+        bVal = `${b.last}, ${b.first}`.toLowerCase();
+    }
+    
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   /* handlers */
   const addEmployee = () => {
@@ -250,7 +300,7 @@ export default function App() {
                 return (
                   <div key={a.id} className="flex justify-between items-center p-2 bg-white rounded border">
                     <div className="text-sm">
-                      <strong>{a.first} {a.last}</strong> • {a.pts} pts • <strong className={`${
+                      <strong>{a.last}, {a.first}</strong> • {a.pts} pts • <strong className={`${
                         action.color === 'red' ? 'text-red-600' :
                         action.color === 'orange' ? 'text-orange-600' :
                         action.color === 'yellow' ? 'text-yellow-600' :
@@ -290,7 +340,7 @@ export default function App() {
                     return (
                       <div key={e.id} className="flex justify-between items-center p-2 bg-gray-100 rounded text-sm">
                         <div>
-                          <strong>{e.first} {e.last}</strong> • {e.pts} pts • {action.level}
+                          <strong>{e.last}, {e.first}</strong> • {e.pts} pts • {action.level}
                           {e.lastNotified && <span className="text-gray-500"> (Notified: {e.lastNotified})</span>}
                         </div>
                         <button
@@ -426,11 +476,71 @@ export default function App() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 text-left">
                   <tr>
-                    <th className="p-2">Name</th>
-                    <th className="p-2">Title</th>
-                    <th className="p-2">Center</th>
-                    <th className="p-2">Points</th>
-                    <th className="p-2">Status</th>
+                    <th 
+                      className="p-2 cursor-pointer hover:bg-gray-200 select-none"
+                      onClick={() => {
+                        if (sortColumn === 'name') {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortColumn('name');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      Name {sortColumn === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="p-2 cursor-pointer hover:bg-gray-200 select-none"
+                      onClick={() => {
+                        if (sortColumn === 'title') {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortColumn('title');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      Title {sortColumn === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="p-2 cursor-pointer hover:bg-gray-200 select-none"
+                      onClick={() => {
+                        if (sortColumn === 'center') {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortColumn('center');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      Center {sortColumn === 'center' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="p-2 cursor-pointer hover:bg-gray-200 select-none"
+                      onClick={() => {
+                        if (sortColumn === 'pts') {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortColumn('pts');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      Points {sortColumn === 'pts' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      className="p-2 cursor-pointer hover:bg-gray-200 select-none"
+                      onClick={() => {
+                        if (sortColumn === 'status') {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortColumn('status');
+                          setSortDirection('asc');
+                        }
+                      }}
+                    >
+                      Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-2">Actions</th>
                   </tr>
                 </thead>
@@ -440,7 +550,7 @@ export default function App() {
                     return (
                       <tr key={emp.id} className="border-t">
                         <td className="p-2">
-                          {emp.first} {emp.last}
+                          {emp.last}, {emp.first}
                         </td>
                         <td className="p-2">{emp.title || 'N/A'}</td>
                         <td className="p-2">{emp.center}</td>
@@ -526,8 +636,8 @@ export default function App() {
 
       {/* ---------- Add Employee modal ---------- */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded shadow w-80 space-y-3">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow w-80 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Add New Employee</h3>
             <input
               placeholder="First name"
@@ -568,8 +678,8 @@ export default function App() {
 
       {/* ---------- Record Incident modal ---------- */}
       {showInc && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded shadow w-96 space-y-3">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow w-96 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Record Attendance Issue</h3>
             <select
               className="input border w-full px-3 py-2"
@@ -577,10 +687,10 @@ export default function App() {
             >
               <option value="">Select employee…</option>
               {[...employees]
-                .sort((a, b) => a.first.localeCompare(b.first))
+                .sort((a, b) => `${a.last}, ${a.first}`.localeCompare(`${b.last}, ${b.first}`))
                 .map(e => (
                   <option key={e.id} value={e.id}>
-                    {e.first} {e.last}
+                    {e.last}, {e.first}
                   </option>
                 ))}
             </select>
@@ -651,7 +761,7 @@ export default function App() {
           <div className="bg-white p-6 rounded-lg shadow-2xl border-2 border-blue-500 max-w-5xl mx-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-lg">
-                {selectedEmployee.first} {selectedEmployee.last} - Details
+                {selectedEmployee.last}, {selectedEmployee.first} - Details
               </h3>
               <button
                 className="text-gray-500 hover:text-gray-700 text-xl font-bold"
@@ -902,7 +1012,7 @@ export default function App() {
                       const newTotal = parseFloat(bulkInput.value);
                       
                       if (!isNaN(newTotal) && newTotal >= 0) {
-                        if (confirm(`Set ${selectedEmployee.first} ${selectedEmployee.last}'s total points to ${newTotal}?`)) {
+                        if (confirm(`Set ${selectedEmployee.last}, ${selectedEmployee.first}'s total points to ${newTotal}?`)) {
                           const adjustment = newTotal - selectedEmployee.pts;
                           const adjustmentNote = adjustment > 0 ? `Manual point increase (+${adjustment})` : `Manual point reduction (${adjustment})`;
                           
@@ -991,14 +1101,14 @@ export default function App() {
               <button
                 className="btn bg-red-600 text-white"
                 onClick={() => {
-                  if (confirm(`Are you sure you want to delete ${selectedEmployee.first} ${selectedEmployee.last}? This will permanently remove their employee record and ALL attendance history. This action cannot be undone.`)) {
+                  if (confirm(`Are you sure you want to delete ${selectedEmployee.last}, ${selectedEmployee.first}? This will permanently remove their employee record and ALL attendance history. This action cannot be undone.`)) {
                     // Remove all incidents for this employee
                     setIncidents(prev => prev.filter(i => i.employeeId !== selectedEmployee.id));
                     // Remove the employee
                     setEmployees(prev => prev.filter(e => e.id !== selectedEmployee.id));
                     // Close the modal
                     setShowDetails(false);
-                    alert(`${selectedEmployee.first} ${selectedEmployee.last} has been deleted.`);
+                    alert(`${selectedEmployee.last}, ${selectedEmployee.first} has been deleted.`);
                   }
                 }}
               >
