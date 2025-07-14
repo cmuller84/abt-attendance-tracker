@@ -8,11 +8,11 @@ html,body{
 
 /* ---------- tiny utility for cards ---------- */
 .card{
-  border:1px solid #d1d5db;   /* gray-300 */
+  border:1px solid #e5e7eb;   /* gray-200 */
   background:#ffffff;
   border-radius:0.5rem;
   padding:1rem;
-  box-shadow:0 1px 2px rgb(0 0 0 / .05);
+  box-shadow:0 1px 3px 0 rgba(0,0,0,0.1),0 1px 2px -1px rgba(0,0,0,0.1);
 }
 
 /* ---------- minimal button set ---------- */
@@ -26,6 +26,7 @@ html,body{
   cursor:pointer;
 }
 .btn:hover{opacity:.9}
+.btn-sm{padding:.25rem .5rem;font-size:.75rem}
 
 /* colour presets that match Tailwind names we used in JSX */
 .bg-blue-600{background:#2563eb;color:#fff;}
@@ -36,13 +37,26 @@ html,body{
 .btn-gray{background:#e5e7eb;color:#374151;}   /* neutral cancel button */
 
 /* Inputs */
-input,select{
-  border:1px solid #d1d5db;
-  border-radius:.25rem;
+input,select,textarea{
+  border:1px solid #374151 !important;
+  border-radius:.375rem;
   padding:.5rem .75rem;
-  font-size:.875rem;
+  font-size:.75rem;
+  background:#ffffff !important;
+  box-shadow:0 1px 2px 0 rgba(0,0,0,0.1) !important;
+  transition:border-color 0.15s ease-in-out;
 }
-input:focus,select:focus{outline:2px solid #2563eb;outline-offset:2px}
+.input{
+  border:1px solid #374151 !important;
+}
+select{
+  font-size:10px;
+}
+textarea{
+  resize:vertical;
+  min-height:60px;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#2563eb !important;box-shadow:0 0 0 3px rgba(37,99,235,0.1) !important}
 
 /* Tables */
 table{width:100%;border-collapse:collapse;font-size:.875rem;}
