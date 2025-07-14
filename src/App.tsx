@@ -78,6 +78,7 @@ export default function App() {
   const [editingIncident, setEditingIncident] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<{reason: string; pts: string; notes: string}>({reason: '', pts: '0', notes: ''});
   const [editingTitle, setEditingTitle] = useState(false);
+  const [editForceRefresh, setEditForceRefresh] = useState(0);
   const [autoBackup, setAutoBackup] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -163,6 +164,64 @@ export default function App() {
   const [inputKey, setInputKey] = useState(0);
   const refreshInputs = () => {
     setInputKey(prev => prev + 1);
+  };
+  
+  /* Safe editing functions to prevent state conflicts */
+  const startEditing = (incident: any) => {
+    setEditingIncident(null); // Clear first
+    setTimeout(() => {
+      setEditValues({
+        reason: incident.reason || '',
+        pts: incident.pts?.toString() || '0',
+        notes: incident.notes || ''
+      });
+      setEditingIncident(incident.id);
+      setEditForceRefresh(prev => prev + 1);
+    }, 10);
+  };
+  
+  const cancelEditing = () => {
+    setEditingIncident(null);
+    setEditValues({reason: '', pts: '0', notes: ''});
+    setEditForceRefresh(prev => prev + 1);
+  };
+  
+  const saveEditing = (incident: any) => {
+    const hasChanges = 
+      editValues.reason !== incident.reason ||
+      parseFloat(editValues.pts) !== incident.pts ||
+      editValues.notes !== (incident.notes || '');
+    
+    if (hasChanges && confirm('Save changes to this incident?')) {
+      const pointDifference = parseFloat(editValues.pts) - incident.pts;
+      
+      setIncidents(prev =>
+        prev.map(i =>
+          i.id === incident.id ? {
+            ...i,
+            reason: editValues.reason,
+            pts: parseFloat(editValues.pts),
+            notes: editValues.notes
+          } : i
+        )
+      );
+      
+      if (selectedEmployee && pointDifference !== 0) {
+        setEmployees(prev =>
+          prev.map(e =>
+            e.id === selectedEmployee.id
+              ? { ...e, pts: Math.max(0, e.pts + pointDifference) }
+              : e
+          )
+        );
+        setSelectedEmployee({
+          ...selectedEmployee,
+          pts: Math.max(0, selectedEmployee.pts + pointDifference)
+        });
+      }
+    }
+    
+    cancelEditing();
   };
 
   /* Restore logic */
@@ -889,11 +948,12 @@ export default function App() {
                         <td className="p-2">
                           {editingIncident === incident.id ? (
                             <input
+                              key={`reason-edit-${editForceRefresh}`}
                               type="text"
                               value={editValues.reason}
                               className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                               onChange={(e) => setEditValues({...editValues, reason: e.target.value})}
-                              tabIndex={0}
+                              onFocus={(e) => e.target.select()}
                               autoFocus
                             />
                           ) : (
@@ -903,6 +963,7 @@ export default function App() {
                         <td className="p-2">
                           {editingIncident === incident.id ? (
                             <input
+                              key={`pts-edit-${editForceRefresh}`}
                               type="text"
                               value={editValues.pts}
                               placeholder="0.5, 1, 2, etc."
@@ -913,7 +974,7 @@ export default function App() {
                                   setEditValues({...editValues, pts: value});
                                 }
                               }}
-                              tabIndex={0}
+                              onFocus={(e) => e.target.select()}
                             />
                           ) : (
                             <span className="text-sm">{incident.pts}</span>
@@ -922,12 +983,13 @@ export default function App() {
                         <td className="p-2">
                           {editingIncident === incident.id ? (
                             <input
+                              key={`notes-edit-${editForceRefresh}`}
                               type="text"
                               value={editValues.notes}
                               placeholder="Add notes..."
                               className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                               onChange={(e) => setEditValues({...editValues, notes: e.target.value})}
-                              tabIndex={0}
+                              onFocus={(e) => e.target.select()}
                             />
                           ) : (
                             <span className="text-xs text-gray-600">{incident.notes || '-'}</span>
@@ -935,71 +997,34 @@ export default function App() {
                         </td>
                         <td className="p-2">
                           {editingIncident === incident.id ? (
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                               <button
                                 className="text-green-600 hover:underline text-xs px-1"
-                                onClick={() => {
-                                  const hasChanges = 
-                                    editValues.reason !== incident.reason ||
-                                    parseFloat(editValues.pts) !== incident.pts ||
-                                    editValues.notes !== (incident.notes || '');
-                                  
-                                  if (hasChanges && confirm('Save changes to this incident?')) {
-                                    const pointDifference = parseFloat(editValues.pts) - incident.pts;
-                                    
-                                    setIncidents(prev =>
-                                      prev.map(i =>
-                                        i.id === incident.id ? {
-                                          ...i,
-                                          reason: editValues.reason,
-                                          pts: parseFloat(editValues.pts),
-                                          notes: editValues.notes
-                                        } : i
-                                      )
-                                    );
-                                    
-                                    setEmployees(prev =>
-                                      prev.map(e =>
-                                        e.id === selectedEmployee.id
-                                          ? { ...e, pts: Math.max(0, e.pts + pointDifference) }
-                                          : e
-                                      )
-                                    );
-                                    
-                                    setSelectedEmployee({
-                                      ...selectedEmployee,
-                                      pts: Math.max(0, selectedEmployee.pts + pointDifference)
-                                    });
-                                  }
-                                  
-                                  setEditingIncident(null);
-                                  setEditValues({reason: '', pts: '0', notes: ''});
-                                }}
+                                onClick={() => saveEditing(incident)}
                               >
                                 Save
                               </button>
                               <button
                                 className="text-gray-600 hover:underline text-xs px-1"
-                                onClick={() => {
-                                  setEditingIncident(null);
-                                  setEditValues({reason: '', pts: '0', notes: ''});
-                                }}
+                                onClick={cancelEditing}
                               >
                                 Cancel
+                              </button>
+                              <button
+                                className="text-blue-600 hover:underline text-xs px-1"
+                                onClick={() => {
+                                  setEditForceRefresh(prev => prev + 1);
+                                }}
+                                title="Refresh inputs if stuck"
+                              >
+                                ↻
                               </button>
                             </div>
                           ) : (
                             <div className="flex gap-2">
                               <button
                                 className="text-blue-600 hover:underline text-xs px-1"
-                                onClick={() => {
-                                  setEditingIncident(incident.id);
-                                  setEditValues({
-                                    reason: incident.reason,
-                                    pts: incident.pts.toString(),
-                                    notes: incident.notes || ''
-                                  });
-                                }}
+                                onClick={() => startEditing(incident)}
                               >
                                 Edit
                               </button>
