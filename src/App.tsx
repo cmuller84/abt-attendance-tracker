@@ -90,13 +90,11 @@ export default function App() {
     try {
       const employeesData = localStorage.getItem('employees') ?? '[]';
       const incidentsData = localStorage.getItem('incidents') ?? '[]';
-      console.log('Loading data:', { employeesData, incidentsData });
       setEmployees(JSON.parse(employeesData));
       setIncidents(JSON.parse(incidentsData));
       setAutoBackup(localStorage.getItem('auto-backup-enabled') === 'true');
       setHasUnsavedChanges(false);
     } catch (error) {
-      console.error('Error loading data from localStorage:', error);
       setEmployees([]);
       setIncidents([]);
     }
