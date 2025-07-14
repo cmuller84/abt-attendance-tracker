@@ -97,16 +97,20 @@ export default function App() {
       setIncidents(JSON.parse(incidentsData));
       setAutoBackup(localStorage.getItem('auto-backup-enabled') === 'true');
       setHasUnsavedChanges(false);
+      setAutoBackupLoaded(true);
     } catch (error) {
       setEmployees([]);
       setIncidents([]);
     }
   }, []);
   
-  /* Auto backup toggle persistence */
+  /* Auto backup toggle persistence - only save when user explicitly changes it */
+  const [autoBackupLoaded, setAutoBackupLoaded] = useState(false);
   useEffect(() => {
-    localStorage.setItem('auto-backup-enabled', autoBackup.toString());
-  }, [autoBackup]);
+    if (autoBackupLoaded) {
+      localStorage.setItem('auto-backup-enabled', autoBackup.toString());
+    }
+  }, [autoBackup, autoBackupLoaded]);
   
   /* Warn before leaving page if unsaved changes */
   useEffect(() => {
@@ -345,7 +349,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="w-full max-w-6xl space-y-6">
+      <div className="w-full max-w-7xl space-y-8">
         {/* alerts */}
         <section className="border border-orange-200 bg-orange-50 rounded p-4 shadow">
           <div className="flex justify-between items-center mb-2">
@@ -442,94 +446,115 @@ export default function App() {
           )}
         </section>
 
-        {/* toolbar */}
-        <div className="flex flex-wrap gap-2 items-start">
-          <button
-            className="btn bg-blue-600 text-white hover:bg-blue-700"
-            onClick={() => setShowAdd(true)}
-          >
-            Add New Employee
-          </button>
-          <button
-            className="btn bg-indigo-600 text-white hover:bg-indigo-700"
-            onClick={() => setShowInc(true)}
-          >
-            Record Attendance Issue
-          </button>
-          <button
-            className="btn bg-green-600 text-white hover:bg-green-700"
-            onClick={() => exportCSV(employees, incidents)}
-          >
-            Export to Excel
-          </button>
-          <button
-            className="btn bg-gray-600 text-white hover:bg-gray-700 text-xs"
-            onClick={refreshInputs}
-            title="Click if inputs stop working"
-          >
-            Fix Inputs
-          </button>
-          <button
-            className="btn bg-sky-600 text-white hover:bg-sky-700"
-            onClick={() => {
-              downloadBackup(employees, incidents);
-              setHasUnsavedChanges(false);
-            }}
-          >
-            Backup ⭱
-          </button>
-          
-          {!autoBackup && hasUnsavedChanges && (
-            <button
-              className="btn bg-red-500 text-white hover:bg-red-600 animate-pulse"
-              onClick={() => {
-                downloadBackup(employees, incidents);
-                setHasUnsavedChanges(false);
-              }}
-            >
-              ⚠️ Backup Unsaved Changes
-            </button>
-          )}
-          <button
-            className="btn bg-yellow-500 text-white hover:bg-yellow-600"
-            onClick={() => filePicker.current?.click()}
-          >
-            Restore ⭳
-          </button>
-          
-          <div className="flex items-center gap-2 ml-4">
-            <input
-              type="checkbox"
-              id="auto-backup"
-              checked={autoBackup}
-              onChange={(e) => setAutoBackup(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <label htmlFor="auto-backup" className="text-sm font-medium">
-              Auto-backup enabled
-            </label>
-          </div>
-          
-          {autoBackup && (
-            <div className="text-xs text-gray-600 flex items-center gap-1">
-              <span>✅ Auto-backup active</span>
+        {/* controls */}
+        <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+          {/* Main action buttons */}
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
+            <div className="flex flex-wrap gap-3">
               <button
-                className="text-blue-600 hover:underline"
-                onClick={() => {
-                  const backup = localStorage.getItem('auto-backup');
-                  const timestamp = localStorage.getItem('auto-backup-timestamp');
-                  if (backup && timestamp) {
-                    const date = new Date(timestamp).toLocaleString();
-                    alert(`Last auto-backup: ${date}`);
-                  } else {
-                    alert('No auto-backup found');
-                  }
-                }}
+                className="btn bg-blue-600 text-white hover:bg-blue-700"
+                onClick={() => setShowAdd(true)}
               >
-                (check last backup)
+                Add New Employee
+              </button>
+              <button
+                className="btn bg-indigo-600 text-white hover:bg-indigo-700"
+                onClick={() => setShowInc(true)}
+              >
+                Record Attendance Issue
+              </button>
+              <button
+                className="btn bg-green-600 text-white hover:bg-green-700"
+                onClick={() => exportCSV(employees, incidents)}
+              >
+                Export to Excel
               </button>
             </div>
-          )}
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="btn bg-sky-600 text-white hover:bg-sky-700"
+                onClick={() => {
+                  downloadBackup(employees, incidents);
+                  setHasUnsavedChanges(false);
+                }}
+              >
+                Backup ⭱
+              </button>
+              {!autoBackup && hasUnsavedChanges && (
+                <button
+                  className="btn bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                  onClick={() => {
+                    downloadBackup(employees, incidents);
+                    setHasUnsavedChanges(false);
+                  }}
+                >
+                  ⚠️ Backup Unsaved Changes
+                </button>
+              )}
+              <button
+                className="btn bg-yellow-500 text-white hover:bg-yellow-600"
+                onClick={() => filePicker.current?.click()}
+              >
+                Restore ⭳
+              </button>
+              <button
+                className="btn bg-gray-600 text-white hover:bg-gray-700 text-xs"
+                onClick={refreshInputs}
+                title="Click if inputs stop working"
+              >
+                Fix Inputs
+              </button>
+            </div>
+          </div>
+          
+          {/* Search and settings row */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between pt-4 border-t border-gray-200">
+            <input
+              type="text"
+              placeholder="Search employees…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input border border-gray-300 rounded-lg px-4 py-2.5 w-full sm:w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
+            
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="auto-backup"
+                  checked={autoBackup}
+                  onChange={(e) => setAutoBackup(e.target.checked)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <label htmlFor="auto-backup" className="text-sm font-medium text-gray-700">
+                  Auto-backup enabled
+                </label>
+              </div>
+              
+              {autoBackup && (
+                <div className="text-xs text-gray-600 flex items-center gap-1">
+                  <span className="text-green-600">✅ Auto-backup active</span>
+                  <button
+                    className="text-blue-600 hover:underline ml-1"
+                    onClick={() => {
+                      const backup = localStorage.getItem('auto-backup');
+                      const timestamp = localStorage.getItem('auto-backup-timestamp');
+                      if (backup && timestamp) {
+                        const date = new Date(timestamp).toLocaleString();
+                        alert(`Last auto-backup: ${date}`);
+                      } else {
+                        alert('No auto-backup found');
+                      }
+                    }}
+                  >
+                    (check last backup)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
           <input
             ref={filePicker}
             type="file"
@@ -537,20 +562,12 @@ export default function App() {
             onChange={handleImport}
             style={{ display: 'none' }}
           />
-
-          <input
-            type="text"
-            placeholder="Search employees…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input border border-gray-300 rounded px-3 py-2 flex-grow md:w-64"
-          />
         </div>
 
         {/* table */}
-        <section className="border border-gray-300 bg-white rounded p-4 shadow">
-          <h2 className="font-semibold text-gray-800 mb-3">
-            Employee Attendance Records
+        <section className="border border-gray-200 bg-white rounded-lg p-6 shadow-lg">
+          <h2 className="font-semibold text-gray-800 mb-4 text-lg">
+            Employee Attendance Records ({employees.length} employees)
           </h2>
 
           {employees.length === 0 ? (
