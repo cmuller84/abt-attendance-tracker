@@ -10,6 +10,8 @@ interface Employee {
   center: string;
   title: string;
   pts: number;
+  notificationCleared?: boolean;
+  lastNotified?: string;
 }
 interface Incident {
   id: number;
@@ -73,6 +75,11 @@ export default function App() {
   const [showInc, setShowInc] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [editingIncident, setEditingIncident] = useState<number | null>(null);
+  const [editValues, setEditValues] = useState<{reason: string; pts: string; notes: string}>({reason: '', pts: '0', notes: ''});
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [autoBackup, setAutoBackup] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   /* form refs */
   const addRef = useRef({ first: '', last: '', center: '', title: '' });
@@ -80,15 +87,53 @@ export default function App() {
 
   /* preload localStorage */
   useEffect(() => {
-    setEmployees(JSON.parse(localStorage.getItem('employees') ?? '[]'));
-    setIncidents(JSON.parse(localStorage.getItem('incidents') ?? '[]'));
+    try {
+      const employeesData = localStorage.getItem('employees') ?? '[]';
+      const incidentsData = localStorage.getItem('incidents') ?? '[]';
+      console.log('Loading data:', { employeesData, incidentsData });
+      setEmployees(JSON.parse(employeesData));
+      setIncidents(JSON.parse(incidentsData));
+      setAutoBackup(localStorage.getItem('auto-backup-enabled') === 'true');
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error);
+      setEmployees([]);
+      setIncidents([]);
+    }
   }, []);
+  
+  /* Auto backup toggle persistence */
+  useEffect(() => {
+    localStorage.setItem('auto-backup-enabled', autoBackup.toString());
+  }, [autoBackup]);
+  
+  /* Warn before leaving page if unsaved changes */
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && !autoBackup) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Would you like to backup your data first?';
+        return 'You have unsaved changes. Would you like to backup your data first?';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, autoBackup]);
 
   /* persist on change */
   useEffect(() => {
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('incidents', JSON.stringify(incidents));
-  }, [employees, incidents]);
+    setHasUnsavedChanges(true);
+    
+    // Auto backup if enabled
+    if (autoBackup && (employees.length > 0 || incidents.length > 0)) {
+      const backupData = { employees, incidents };
+      localStorage.setItem('auto-backup', JSON.stringify(backupData));
+      localStorage.setItem('auto-backup-timestamp', new Date().toISOString());
+    }
+  }, [employees, incidents, autoBackup]);
 
   /* Restore logic */
   const filePicker = useRef<HTMLInputElement | null>(null);
@@ -106,6 +151,7 @@ export default function App() {
         setEmployees(emp);
         setIncidents(inc);
         alert('✅ Backup restored');
+        setHasUnsavedChanges(false);
       } catch {
         alert('❌ Invalid backup file');
       }
@@ -115,14 +161,14 @@ export default function App() {
 
   /* derived */
   const getActionLevel = (pts: number) => {
-    if (pts >= 15) return { level: 'Termination', color: 'red' };
+    if (pts >= 15) return { level: 'Removal from center schedule', color: 'red' };
     if (pts >= 12) return { level: 'Final Warning (PIP)', color: 'orange' };
     if (pts >= 8) return { level: 'Written Warning', color: 'yellow' };
     if (pts >= 4) return { level: 'Verbal Warning', color: 'blue' };
     return { level: 'Good Standing', color: 'green' };
   };
   
-  const alerts = employees.filter(e => e.pts >= 4);
+  const alerts = employees.filter(e => e.pts >= 4 && !e.notificationCleared);
   const visible = employees.filter(e =>
     `${e.first} ${e.last}`.toLowerCase().includes(search.toLowerCase())
   );
@@ -173,22 +219,97 @@ export default function App() {
       <div className="w-full max-w-6xl space-y-6">
         {/* alerts */}
         <section className="border border-orange-200 bg-orange-50 rounded p-4 shadow">
-          <h2 className="font-semibold text-orange-600 mb-2">
-            ⚠️ Alerts Requiring Action ({alerts.length})
-          </h2>
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="font-semibold text-orange-600">
+              ⚠️ Alerts Requiring Action ({alerts.length})
+            </h2>
+            {alerts.length > 0 && (
+              <button
+                className="btn btn-sm bg-gray-500 text-white text-xs"
+                onClick={() => {
+                  if (confirm('Clear all current alerts? This will mark all employees as notified.')) {
+                    const today = new Date().toISOString().split('T')[0];
+                    setEmployees(prev =>
+                      prev.map(e =>
+                        e.pts >= 4 ? { ...e, notificationCleared: true, lastNotified: today } : e
+                      )
+                    );
+                  }
+                }}
+              >
+                Clear All
+              </button>
+            )}
+          </div>
           {alerts.length === 0 ? (
             <p className="text-sm text-gray-600">No alerts at this time</p>
           ) : (
-            <ul className="list-disc pl-6 space-y-1 text-sm">
+            <div className="space-y-2">
               {alerts.map(a => {
                 const action = getActionLevel(a.pts);
                 return (
-                  <li key={a.id}>
-                    {a.first} {a.last} • {a.pts} pts • <strong>{action.level}</strong>
-                  </li>
+                  <div key={a.id} className="flex justify-between items-center p-2 bg-white rounded border">
+                    <div className="text-sm">
+                      <strong>{a.first} {a.last}</strong> • {a.pts} pts • <strong className={`${
+                        action.color === 'red' ? 'text-red-600' :
+                        action.color === 'orange' ? 'text-orange-600' :
+                        action.color === 'yellow' ? 'text-yellow-600' :
+                        'text-blue-600'
+                      }`}>{action.level}</strong>
+                    </div>
+                    <button
+                      className="btn btn-sm bg-green-600 text-white text-xs px-2 py-1"
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        setEmployees(prev =>
+                          prev.map(e =>
+                            e.id === a.id ? { ...e, notificationCleared: true, lastNotified: today } : e
+                          )
+                        );
+                      }}
+                    >
+                      Mark Notified
+                    </button>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
+          )}
+          
+          {/* Show recently cleared notifications */}
+          {employees.filter(e => e.notificationCleared && e.pts >= 4).length > 0 && (
+            <details className="mt-4">
+              <summary className="text-sm text-gray-600 cursor-pointer">
+                Recently Cleared Notifications ({employees.filter(e => e.notificationCleared && e.pts >= 4).length})
+              </summary>
+              <div className="mt-2 space-y-1">
+                {employees
+                  .filter(e => e.notificationCleared && e.pts >= 4)
+                  .map(e => {
+                    const action = getActionLevel(e.pts);
+                    return (
+                      <div key={e.id} className="flex justify-between items-center p-2 bg-gray-100 rounded text-sm">
+                        <div>
+                          <strong>{e.first} {e.last}</strong> • {e.pts} pts • {action.level}
+                          {e.lastNotified && <span className="text-gray-500"> (Notified: {e.lastNotified})</span>}
+                        </div>
+                        <button
+                          className="text-orange-600 hover:underline text-xs"
+                          onClick={() => {
+                            setEmployees(prev =>
+                              prev.map(emp =>
+                                emp.id === e.id ? { ...emp, notificationCleared: false, lastNotified: undefined } : emp
+                              )
+                            );
+                          }}
+                        >
+                          Restore Alert
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            </details>
           )}
         </section>
 
@@ -214,16 +335,65 @@ export default function App() {
           </button>
           <button
             className="btn bg-sky-600 text-white hover:bg-sky-700"
-            onClick={() => downloadBackup(employees, incidents)}
+            onClick={() => {
+              downloadBackup(employees, incidents);
+              setHasUnsavedChanges(false);
+            }}
           >
             Backup ⭱
           </button>
+          
+          {!autoBackup && hasUnsavedChanges && (
+            <button
+              className="btn bg-red-500 text-white hover:bg-red-600 animate-pulse"
+              onClick={() => {
+                downloadBackup(employees, incidents);
+                setHasUnsavedChanges(false);
+              }}
+            >
+              ⚠️ Backup Unsaved Changes
+            </button>
+          )}
           <button
             className="btn bg-yellow-500 text-white hover:bg-yellow-600"
             onClick={() => filePicker.current?.click()}
           >
             Restore ⭳
           </button>
+          
+          <div className="flex items-center gap-2 ml-4">
+            <input
+              type="checkbox"
+              id="auto-backup"
+              checked={autoBackup}
+              onChange={(e) => setAutoBackup(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <label htmlFor="auto-backup" className="text-sm font-medium">
+              Auto-backup enabled
+            </label>
+          </div>
+          
+          {autoBackup && (
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              <span>✅ Auto-backup active</span>
+              <button
+                className="text-blue-600 hover:underline"
+                onClick={() => {
+                  const backup = localStorage.getItem('auto-backup');
+                  const timestamp = localStorage.getItem('auto-backup-timestamp');
+                  if (backup && timestamp) {
+                    const date = new Date(timestamp).toLocaleString();
+                    alert(`Last auto-backup: ${date}`);
+                  } else {
+                    alert('No auto-backup found');
+                  }
+                }}
+              >
+                (check last backup)
+              </button>
+            </div>
+          )}
           <input
             ref={filePicker}
             type="file"
@@ -304,6 +474,53 @@ export default function App() {
               </table>
             </div>
           )}
+        </section>
+
+        {/* Policy Reference */}
+        <section className="border border-gray-200 bg-gray-50 rounded p-4 shadow mt-6">
+          <h2 className="font-semibold text-gray-800 mb-3">ABT Center Attendance Policy Reference</h2>
+          
+          <div className="grid md:grid-cols-2 gap-6 text-sm">
+            <div>
+              <h3 className="font-semibold mb-2 text-gray-700">Point System</h3>
+              <ul className="space-y-1 text-gray-600">
+                <li>• <strong>No-Call/No-Show:</strong> 10 points</li>
+                <li>• <strong>Late Arrival:</strong> 2 points</li>
+                <li>• <strong>Early Departure:</strong> 2 points</li>
+                <li>• <strong>Planned Absence (&lt;24hr notice):</strong> 4 points</li>
+                <li>• <strong>Unexpected Illness/Emergency (after 7AM):</strong> 4 points</li>
+              </ul>
+
+              <h3 className="font-semibold mb-2 mt-4 text-gray-700">Communication Requirements</h3>
+              <ul className="space-y-1 text-gray-600">
+                <li>• Planned absences: 24+ hours advance notice</li>
+                <li>• PTO requests: 1+ week advance notice</li>
+                <li>• Unexpected illness: By 7:00 AM same day</li>
+                <li>• Email: center@advancedabatherapy.com (Beachwood)</li>
+                <li>• Email: centercol@advancedabatherapy.com (Columbus)</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-2 text-gray-700">Corrective Actions</h3>
+              <ul className="space-y-1 text-gray-600">
+                <li>• <span className="text-blue-600 font-semibold">4-7 Points:</span> Verbal Warning</li>
+                <li>• <span className="text-yellow-600 font-semibold">8-11 Points:</span> Written Warning</li>
+                <li>• <span className="text-orange-600 font-semibold">12-14 Points:</span> Final Warning (PIP)</li>
+                <li>• <span className="text-red-600 font-semibold">15+ Points:</span> Removal from center schedule</li>
+              </ul>
+
+              <h3 className="font-semibold mb-2 mt-4 text-gray-700">Special Considerations</h3>
+              <ul className="space-y-1 text-gray-600">
+                <li>• Single NCNS = automatic written warning minimum</li>
+                <li>• Second NCNS within 12 months = immediate removal</li>
+                <li>• First 90 days: First NCNS = immediate removal</li>
+                <li>• Points reset annually on Jan 1 (with conditions)</li>
+                <li>• Consecutive days for same illness = single occurrence</li>
+                <li>• Medical absences 2+ days require doctor's note</li>
+              </ul>
+            </div>
+          </div>
         </section>
       </div>
 
@@ -414,11 +631,19 @@ export default function App() {
 
       {/* ---------- Employee Details modal ---------- */}
       {showDetails && selectedEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center overflow-y-auto">
-          <div className="bg-white p-6 rounded shadow max-w-4xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-semibold mb-4 text-lg">
-              {selectedEmployee.first} {selectedEmployee.last} - Details
-            </h3>
+        <div className="w-full max-w-6xl mt-6 mb-6">
+          <div className="bg-white p-6 rounded-lg shadow-2xl border-2 border-blue-500 max-w-5xl mx-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold text-lg">
+                {selectedEmployee.first} {selectedEmployee.last} - Details
+              </h3>
+              <button
+                className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                onClick={() => setShowDetails(false)}
+              >
+                ×
+              </button>
+            </div>
             
             <div className="mb-4 p-3 bg-gray-100 rounded">
               <div className="grid grid-cols-2 gap-2">
@@ -428,27 +653,38 @@ export default function App() {
                 </div>
                 <div>
                   <p><strong>Job Title:</strong> 
-                    <select
-                      className="ml-2 input border px-2 py-1 text-xs"
-                      value={selectedEmployee.title || ''}
-                      onChange={e => {
-                        const newTitle = e.target.value;
-                        setEmployees(prev =>
-                          prev.map(emp =>
-                            emp.id === selectedEmployee.id
-                              ? { ...emp, title: newTitle }
-                              : emp
-                          )
-                        );
-                        setSelectedEmployee({ ...selectedEmployee, title: newTitle });
-                      }}
-                    >
-                      <option value="">Select...</option>
-                      <option value="BT">BT</option>
-                      <option value="RBT">RBT</option>
-                      <option value="RBTCA">RBTCA</option>
-                      <option value="BCBA">BCBA</option>
-                    </select>
+                    {editingTitle ? (
+                      <select
+                        className="ml-2 input border px-2 py-1 text-xs"
+                        value={selectedEmployee.title || ''}
+                        onChange={e => {
+                          const newTitle = e.target.value;
+                          setEmployees(prev =>
+                            prev.map(emp =>
+                              emp.id === selectedEmployee.id
+                                ? { ...emp, title: newTitle }
+                                : emp
+                            )
+                          );
+                          setSelectedEmployee({ ...selectedEmployee, title: newTitle });
+                          setEditingTitle(false);
+                        }}
+                        onBlur={() => setEditingTitle(false)}
+                      >
+                        <option value="">Select...</option>
+                        <option value="BT">BT</option>
+                        <option value="RBT">RBT</option>
+                        <option value="RBTCA">RBTCA</option>
+                        <option value="BCBA">BCBA</option>
+                      </select>
+                    ) : (
+                      <span 
+                        className="ml-2 text-blue-600 hover:underline cursor-pointer"
+                        onClick={() => setEditingTitle(true)}
+                      >
+                        {selectedEmployee.title || 'Click to set'}
+                      </span>
+                    )}
                   </p>
                   <p><strong>Status:</strong> <span className={`font-semibold ${
                     getActionLevel(selectedEmployee.pts).color === 'red' ? 'text-red-600' :
@@ -480,31 +716,146 @@ export default function App() {
                     .map(incident => (
                       <tr key={incident.id} className="border-t">
                         <td className="p-2">{incident.date}</td>
-                        <td className="p-2">{incident.reason}</td>
-                        <td className="p-2">{incident.pts}</td>
-                        <td className="p-2 text-xs text-gray-600">{incident.notes || '-'}</td>
                         <td className="p-2">
-                          <button
-                            className="text-red-600 hover:underline text-xs"
-                            onClick={() => {
-                              if (confirm('Remove this incident?')) {
-                                setIncidents(prev => prev.filter(i => i.id !== incident.id));
-                                setEmployees(prev =>
-                                  prev.map(e =>
-                                    e.id === selectedEmployee.id
-                                      ? { ...e, pts: Math.max(0, e.pts - incident.pts) }
-                                      : e
-                                  )
-                                );
-                                setSelectedEmployee({
-                                  ...selectedEmployee,
-                                  pts: Math.max(0, selectedEmployee.pts - incident.pts)
-                                });
-                              }
-                            }}
-                          >
-                            Remove
-                          </button>
+                          {editingIncident === incident.id ? (
+                            <input
+                              type="text"
+                              value={editValues.reason}
+                              className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              onChange={(e) => setEditValues({...editValues, reason: e.target.value})}
+                              tabIndex={0}
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="text-sm">{incident.reason}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingIncident === incident.id ? (
+                            <input
+                              type="text"
+                              value={editValues.pts}
+                              placeholder="0.5, 1, 2, etc."
+                              className="w-20 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  setEditValues({...editValues, pts: value});
+                                }
+                              }}
+                              tabIndex={0}
+                            />
+                          ) : (
+                            <span className="text-sm">{incident.pts}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingIncident === incident.id ? (
+                            <input
+                              type="text"
+                              value={editValues.notes}
+                              placeholder="Add notes..."
+                              className="w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              onChange={(e) => setEditValues({...editValues, notes: e.target.value})}
+                              tabIndex={0}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-600">{incident.notes || '-'}</span>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingIncident === incident.id ? (
+                            <div className="flex gap-2">
+                              <button
+                                className="text-green-600 hover:underline text-xs px-1"
+                                onClick={() => {
+                                  const hasChanges = 
+                                    editValues.reason !== incident.reason ||
+                                    parseFloat(editValues.pts) !== incident.pts ||
+                                    editValues.notes !== (incident.notes || '');
+                                  
+                                  if (hasChanges && confirm('Save changes to this incident?')) {
+                                    const pointDifference = parseFloat(editValues.pts) - incident.pts;
+                                    
+                                    setIncidents(prev =>
+                                      prev.map(i =>
+                                        i.id === incident.id ? {
+                                          ...i,
+                                          reason: editValues.reason,
+                                          pts: parseFloat(editValues.pts),
+                                          notes: editValues.notes
+                                        } : i
+                                      )
+                                    );
+                                    
+                                    setEmployees(prev =>
+                                      prev.map(e =>
+                                        e.id === selectedEmployee.id
+                                          ? { ...e, pts: Math.max(0, e.pts + pointDifference) }
+                                          : e
+                                      )
+                                    );
+                                    
+                                    setSelectedEmployee({
+                                      ...selectedEmployee,
+                                      pts: Math.max(0, selectedEmployee.pts + pointDifference)
+                                    });
+                                  }
+                                  
+                                  setEditingIncident(null);
+                                  setEditValues({reason: '', pts: '0', notes: ''});
+                                }}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="text-gray-600 hover:underline text-xs px-1"
+                                onClick={() => {
+                                  setEditingIncident(null);
+                                  setEditValues({reason: '', pts: '0', notes: ''});
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                className="text-blue-600 hover:underline text-xs px-1"
+                                onClick={() => {
+                                  setEditingIncident(incident.id);
+                                  setEditValues({
+                                    reason: incident.reason,
+                                    pts: incident.pts.toString(),
+                                    notes: incident.notes || ''
+                                  });
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-red-600 hover:underline text-xs px-1"
+                                onClick={() => {
+                                  if (confirm('Remove this incident?')) {
+                                    setIncidents(prev => prev.filter(i => i.id !== incident.id));
+                                    setEmployees(prev =>
+                                      prev.map(e =>
+                                        e.id === selectedEmployee.id
+                                          ? { ...e, pts: Math.max(0, e.pts - incident.pts) }
+                                          : e
+                                      )
+                                    );
+                                    setSelectedEmployee({
+                                      ...selectedEmployee,
+                                      pts: Math.max(0, selectedEmployee.pts - incident.pts)
+                                    });
+                                  }
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -516,60 +867,127 @@ export default function App() {
             </div>
 
             <div className="mb-4">
-              <h4 className="font-semibold mb-2">Add Note / Adjustment</h4>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Note (e.g., 'Verbal warning given', 'Points reset')"
-                  className="input border flex-grow px-3 py-2"
-                  id="note-input"
-                />
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder="Points adjustment (+/-)"
-                  className="input border w-32 px-3 py-2"
-                  id="points-input"
-                />
-                <button
-                  className="btn bg-green-600 text-white"
-                  onClick={() => {
-                    const noteInput = document.getElementById('note-input') as HTMLInputElement;
-                    const pointsInput = document.getElementById('points-input') as HTMLInputElement;
-                    const note = noteInput.value;
-                    const points = parseFloat(pointsInput.value) || 0;
-                    
-                    if (note) {
-                      const newIncident: Incident = {
-                        id: Date.now(),
-                        employeeId: selectedEmployee.id,
-                        date: new Date().toISOString().split('T')[0],
-                        reason: note,
-                        pts: points
-                      };
-                      setIncidents(prev => [...prev, newIncident]);
-                      setEmployees(prev =>
-                        prev.map(e =>
-                          e.id === selectedEmployee.id
-                            ? { ...e, pts: Math.max(0, e.pts + points) }
-                            : e
-                        )
-                      );
-                      setSelectedEmployee({
-                        ...selectedEmployee,
-                        pts: Math.max(0, selectedEmployee.pts + points)
-                      });
-                      noteInput.value = '';
-                      pointsInput.value = '';
-                    }
-                  }}
-                >
-                  Add
-                </button>
+              <h4 className="font-semibold mb-2">Quick Actions</h4>
+              <div className="space-y-2">
+                {/* Bulk Point Adjustment */}
+                <div className="flex gap-2 items-center">
+                  <label className="text-sm font-medium w-24">Adjust Total:</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder="Set total points"
+                    className="input border w-24 px-2 py-1 text-sm"
+                    id="bulk-points-input"
+                  />
+                  <button
+                    className="btn btn-sm bg-orange-600 text-white"
+                    onClick={() => {
+                      const bulkInput = document.getElementById('bulk-points-input') as HTMLInputElement;
+                      const newTotal = parseFloat(bulkInput.value);
+                      
+                      if (!isNaN(newTotal) && newTotal >= 0) {
+                        if (confirm(`Set ${selectedEmployee.first} ${selectedEmployee.last}'s total points to ${newTotal}?`)) {
+                          const adjustment = newTotal - selectedEmployee.pts;
+                          const adjustmentNote = adjustment > 0 ? `Manual point increase (+${adjustment})` : `Manual point reduction (${adjustment})`;
+                          
+                          // Add adjustment record
+                          const newIncident: Incident = {
+                            id: Date.now(),
+                            employeeId: selectedEmployee.id,
+                            date: new Date().toISOString().split('T')[0],
+                            reason: 'Point Adjustment',
+                            pts: adjustment,
+                            notes: adjustmentNote
+                          };
+                          
+                          setIncidents(prev => [...prev, newIncident]);
+                          setEmployees(prev =>
+                            prev.map(e =>
+                              e.id === selectedEmployee.id ? { ...e, pts: newTotal } : e
+                            )
+                          );
+                          setSelectedEmployee({ ...selectedEmployee, pts: newTotal });
+                          bulkInput.value = '';
+                        }
+                      }
+                    }}
+                  >
+                    Set Total
+                  </button>
+                </div>
+
+                {/* Add Note/Incident */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Note (e.g., 'Verbal warning given', 'Points reset')"
+                    className="input border flex-grow px-3 py-2"
+                    id="note-input"
+                  />
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder="Points (+/-)"
+                    className="input border w-24 px-3 py-2"
+                    id="points-input"
+                  />
+                  <button
+                    className="btn bg-green-600 text-white"
+                    onClick={() => {
+                      const noteInput = document.getElementById('note-input') as HTMLInputElement;
+                      const pointsInput = document.getElementById('points-input') as HTMLInputElement;
+                      const note = noteInput.value;
+                      const points = parseFloat(pointsInput.value) || 0;
+                      
+                      if (note) {
+                        const newIncident: Incident = {
+                          id: Date.now(),
+                          employeeId: selectedEmployee.id,
+                          date: new Date().toISOString().split('T')[0],
+                          reason: note,
+                          pts: points,
+                          notes: note
+                        };
+                        setIncidents(prev => [...prev, newIncident]);
+                        setEmployees(prev =>
+                          prev.map(e =>
+                            e.id === selectedEmployee.id
+                              ? { ...e, pts: Math.max(0, e.pts + points) }
+                              : e
+                          )
+                        );
+                        setSelectedEmployee({
+                          ...selectedEmployee,
+                          pts: Math.max(0, selectedEmployee.pts + points)
+                        });
+                        noteInput.value = '';
+                        pointsInput.value = '';
+                      }
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-between">
+              <button
+                className="btn bg-red-600 text-white"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete ${selectedEmployee.first} ${selectedEmployee.last}? This will permanently remove their employee record and ALL attendance history. This action cannot be undone.`)) {
+                    // Remove all incidents for this employee
+                    setIncidents(prev => prev.filter(i => i.employeeId !== selectedEmployee.id));
+                    // Remove the employee
+                    setEmployees(prev => prev.filter(e => e.id !== selectedEmployee.id));
+                    // Close the modal
+                    setShowDetails(false);
+                    alert(`${selectedEmployee.first} ${selectedEmployee.last} has been deleted.`);
+                  }
+                }}
+              >
+                Delete Employee
+              </button>
               <button 
                 className="btn btn-gray"
                 onClick={() => setShowDetails(false)}
