@@ -81,11 +81,9 @@ export default function App() {
   const [autoBackup, setAutoBackup] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  /* form refs */
-  const addRef = useRef({ first: '', last: '', center: '', title: '' });
-  const incRef = useRef({ empId: '', date: '', reason: '', pts: 0, notes: '' });
-  const [incidentPts, setIncidentPts] = useState<number>(0);
-  const [incidentNotes, setIncidentNotes] = useState<string>('');
+  /* form state - using controlled components to prevent input freezing */
+  const [addForm, setAddForm] = useState({ first: '', last: '', center: '', title: '' });
+  const [incForm, setIncForm] = useState({ empId: '', date: '', reason: '', pts: '0', notes: '' });
   const [sortColumn, setSortColumn] = useState<'name' | 'title' | 'center' | 'pts' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -147,6 +145,25 @@ export default function App() {
       setEditingTitle(false);
     }
   }, [showDetails]);
+  
+  /* Reset forms when modals open */
+  useEffect(() => {
+    if (showAdd) {
+      setAddForm({ first: '', last: '', center: '', title: '' });
+    }
+  }, [showAdd]);
+  
+  useEffect(() => {
+    if (showInc) {
+      setIncForm({ empId: '', date: '', reason: '', pts: '0', notes: '' });
+    }
+  }, [showInc]);
+  
+  /* Error recovery - force re-render inputs if they become unresponsive */
+  const [inputKey, setInputKey] = useState(0);
+  const refreshInputs = () => {
+    setInputKey(prev => prev + 1);
+  };
 
   /* Restore logic */
   const filePicker = useRef<HTMLInputElement | null>(null);
@@ -225,28 +242,31 @@ export default function App() {
 
   /* handlers */
   const addEmployee = () => {
-    const { first, last, center, title } = addRef.current;
+    const { first, last, center, title } = addForm;
     if (!first || !last) return;
     setEmployees(prev => [
       ...prev,
       { id: Date.now(), first, last, center, title, pts: 0 }
     ]);
+    setAddForm({ first: '', last: '', center: '', title: '' });
     setShowAdd(false);
   };
 
   const addIncident = () => {
-    const { empId, date, reason, pts, notes } = incRef.current;
+    const { empId, date, reason, pts, notes } = incForm;
     if (!empId || !reason) return;
     const id = Date.now();
+    const pointsNum = parseFloat(pts) || 0;
     setIncidents(prev => [
       ...prev,
-      { id, employeeId: Number(empId), date, reason, pts: Number(pts), notes }
+      { id, employeeId: Number(empId), date, reason, pts: pointsNum, notes }
     ]);
     setEmployees(prev =>
       prev.map(e =>
-        e.id === Number(empId) ? { ...e, pts: e.pts + Number(pts) } : e
+        e.id === Number(empId) ? { ...e, pts: e.pts + pointsNum } : e
       )
     );
+    setIncForm({ empId: '', date: '', reason: '', pts: '0', notes: '' });
     setShowInc(false);
   };
 
@@ -382,6 +402,13 @@ export default function App() {
             onClick={() => exportCSV(employees, incidents)}
           >
             Export to Excel
+          </button>
+          <button
+            className="btn bg-gray-600 text-white hover:bg-gray-700 text-xs"
+            onClick={refreshInputs}
+            title="Click if inputs stop working"
+          >
+            Fix Inputs
           </button>
           <button
             className="btn bg-sky-600 text-white hover:bg-sky-700"
@@ -640,23 +667,32 @@ export default function App() {
           <div className="bg-white p-6 rounded shadow w-80 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Add New Employee</h3>
             <input
+              key={`first-${inputKey}`}
               placeholder="First name"
+              value={addForm.first}
               className="input border w-full px-3 py-2"
-              onChange={e => (addRef.current.first = e.target.value)}
+              onChange={e => setAddForm({...addForm, first: e.target.value})}
+              autoFocus
             />
             <input
+              key={`last-${inputKey}`}
               placeholder="Last name"
+              value={addForm.last}
               className="input border w-full px-3 py-2"
-              onChange={e => (addRef.current.last = e.target.value)}
+              onChange={e => setAddForm({...addForm, last: e.target.value})}
             />
             <input
+              key={`center-${inputKey}`}
               placeholder="Center"
+              value={addForm.center}
               className="input border w-full px-3 py-2"
-              onChange={e => (addRef.current.center = e.target.value)}
+              onChange={e => setAddForm({...addForm, center: e.target.value})}
             />
             <select
+              key={`title-${inputKey}`}
+              value={addForm.title}
               className="input border w-full px-3 py-2"
-              onChange={e => (addRef.current.title = e.target.value)}
+              onChange={e => setAddForm({...addForm, title: e.target.value})}
             >
               <option value="">Select job title…</option>
               <option value="BT">BT</option>
@@ -665,7 +701,10 @@ export default function App() {
               <option value="BCBA">BCBA</option>
             </select>
             <div className="flex justify-end gap-2 mt-2">
-              <button className="btn" onClick={() => setShowAdd(false)}>
+              <button className="btn" onClick={() => {
+                setAddForm({ first: '', last: '', center: '', title: '' });
+                setShowAdd(false);
+              }}>
                 Cancel
               </button>
               <button className="btn bg-blue-600 text-white" onClick={addEmployee}>
@@ -682,8 +721,10 @@ export default function App() {
           <div className="bg-white p-6 rounded shadow w-96 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-semibold mb-2">Record Attendance Issue</h3>
             <select
+              key={`emp-${inputKey}`}
+              value={incForm.empId}
               className="input border w-full px-3 py-2"
-              onChange={e => (incRef.current.empId = e.target.value)}
+              onChange={e => setIncForm({...incForm, empId: e.target.value})}
             >
               <option value="">Select employee…</option>
               {[...employees]
@@ -695,18 +736,23 @@ export default function App() {
                 ))}
             </select>
             <input
+              key={`date-${inputKey}`}
               type="date"
+              value={incForm.date}
               className="input border w-full px-3 py-2"
-              onChange={e => (incRef.current.date = e.target.value)}
+              onChange={e => setIncForm({...incForm, date: e.target.value})}
             />
             <select
+              key={`reason-${inputKey}`}
+              value={incForm.reason ? `${incForm.reason}|${incForm.pts}` : ''}
               className="input border w-full px-3 py-2"
               onChange={e => {
-                const [reason, pts] = e.target.value.split('|');
-                incRef.current.reason = reason;
-                const pointValue = parseFloat(pts);
-                incRef.current.pts = pointValue;
-                setIncidentPts(pointValue);
+                if (e.target.value) {
+                  const [reason, pts] = e.target.value.split('|');
+                  setIncForm({...incForm, reason, pts});
+                } else {
+                  setIncForm({...incForm, reason: '', pts: '0'});
+                }
               }}
             >
               <option value="">Select offense type…</option>
@@ -718,31 +764,29 @@ export default function App() {
               <option value="Other|0">Other (Custom Points)</option>
             </select>
             <input
+              key={`pts-${inputKey}`}
               type="number"
               step="0.5"
               placeholder="Points"
-              value={incidentPts}
+              value={incForm.pts}
               className="input border w-full px-3 py-2"
               onChange={e => {
-                const value = parseFloat(e.target.value) || 0;
-                setIncidentPts(value);
-                incRef.current.pts = value;
+                const value = e.target.value;
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  setIncForm({...incForm, pts: value});
+                }
               }}
             />
             <textarea
+              key={`notes-${inputKey}`}
               placeholder="Notes (optional)"
-              value={incidentNotes}
+              value={incForm.notes}
               className="input border w-full px-3 py-2"
-              onChange={e => {
-                setIncidentNotes(e.target.value);
-                incRef.current.notes = e.target.value;
-              }}
+              onChange={e => setIncForm({...incForm, notes: e.target.value})}
             />
             <div className="flex justify-end gap-2 mt-2">
               <button className="btn" onClick={() => {
-                incRef.current = { empId: '', date: '', reason: '', pts: 0, notes: '' };
-                setIncidentPts(0);
-                setIncidentNotes('');
+                setIncForm({ empId: '', date: '', reason: '', pts: '0', notes: '' });
                 setShowInc(false);
               }}>
                 Cancel
